@@ -60,6 +60,8 @@ export interface BikeSpecifications {
   seatHeightMm?: number;
 }
 
+export type FuelPowerType = 'Petrol' | 'Diesel' | 'Electric' | 'Hybrid';
+
 export interface Bike {
   id: string;
   name: string;
@@ -68,7 +70,10 @@ export interface Bike {
   bikeType: BikeType;
   brand: string;
   imageUrl: string;
+  imageAlt?: string; // Meaningful alt text for accessibility
   galleryUrls?: string[];
+  fuelPowerType?: FuelPowerType;
+  securityDeposit?: number; // In INR (₹)
   specifications: BikeSpecifications;
   hourlyPrice: number;
   dailyPrice: number;

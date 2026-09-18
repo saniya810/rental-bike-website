@@ -5,6 +5,7 @@ import { formatINR } from '../utils/currency.js';
 export interface FilterState {
   search: string;
   vehicleType: string;
+  fuelPowerType: string;
   category: string;
   brand: string;
   availability: string;
@@ -91,6 +92,20 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
             <option value="Available">Available Only</option>
             <option value="Rented">Currently Rented</option>
             <option value="Maintenance">Maintenance</option>
+          </select>
+
+          {/* Fuel / Power Type Filter */}
+          <select
+            id="bike-fuel-power-filter"
+            value={filters.fuelPowerType}
+            onChange={(e) => onChange({ fuelPowerType: e.target.value })}
+            className="py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="All">All Fuel Types</option>
+            <option value="Petrol">⛽ Petrol</option>
+            <option value="Electric">⚡ Electric</option>
+            <option value="Diesel">🛢️ Diesel</option>
+            <option value="Hybrid">🔋 Hybrid</option>
           </select>
 
           {/* Sort Selector */}

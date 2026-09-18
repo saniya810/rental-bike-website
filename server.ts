@@ -175,12 +175,19 @@ app.put('/api/auth/profile', authenticateToken, (req: AuthRequest, res: Response
 app.get('/api/bikes', (req: Request, res: Response) => {
   let bikes = db.getBikes();
 
-  const { category, vehicleType, brand, availability, search, maxPrice, sort } = req.query;
+  const { category, vehicleType, fuelPowerType, brand, availability, search, maxPrice, sort } = req.query;
 
   if (vehicleType && vehicleType !== 'All') {
     bikes = bikes.filter((b) => {
       const vType = b.vehicleType || (b.specifications?.engineCc ? 'motorcycle' : 'bike');
       return vType.toLowerCase() === (vehicleType as string).toLowerCase();
+    });
+  }
+
+  if (fuelPowerType && fuelPowerType !== 'All') {
+    bikes = bikes.filter((b) => {
+      const fType = b.fuelPowerType || (b.specifications?.fuelType?.toLowerCase().includes('petrol') ? 'Petrol' : b.bikeType.toLowerCase().includes('electric') ? 'Electric' : 'Petrol');
+      return fType.toLowerCase() === (fuelPowerType as string).toLowerCase();
     });
   }
 
@@ -255,6 +262,9 @@ app.post('/api/bikes', authenticateToken, requireAdmin, (req: AuthRequest, res: 
       name,
       model,
       vehicleType,
+      fuelPowerType,
+      securityDeposit,
+      imageAlt,
       bikeType,
       brand,
       imageUrl,
@@ -275,14 +285,19 @@ app.post('/api/bikes', authenticateToken, requireAdmin, (req: AuthRequest, res: 
     const determinedVehicleType =
       vehicleType || (specifications?.engineCc ? 'motorcycle' : 'bike');
 
+    const determinedFuelPowerType =
+      fuelPowerType || (specifications?.fuelType?.toLowerCase().includes('petrol') ? 'Petrol' : bikeType.toLowerCase().includes('electric') ? 'Electric' : undefined);
+
     const newBike: Bike = {
       id: `${determinedVehicleType === 'motorcycle' ? 'moto' : 'bike'}-${brand.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`,
       name,
       model,
       vehicleType: determinedVehicleType,
+      fuelPowerType: determinedFuelPowerType,
       bikeType,
       brand,
       imageUrl,
+      imageAlt: imageAlt || `${name} ${model}`,
       galleryUrls: galleryUrls || [imageUrl],
       specifications: specifications || {
         frameMaterial: 'Aluminum Alloy',
@@ -296,6 +311,7 @@ app.post('/api/bikes', authenticateToken, requireAdmin, (req: AuthRequest, res: 
       },
       hourlyPrice: Number(hourlyPrice),
       dailyPrice: Number(dailyPrice),
+      securityDeposit: securityDeposit !== undefined ? Number(securityDeposit) : (determinedVehicleType === 'motorcycle' ? 3000 : (bikeType.toLowerCase().includes('electric') ? 2000 : 1000)),
       availability: availability || 'Available',
       bikeCondition: bikeCondition || 'Excellent',
       rating: 5.0,

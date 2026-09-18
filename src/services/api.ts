@@ -94,6 +94,8 @@ export const api = {
   // --- Bikes ---
   async getBikes(params?: {
     category?: string;
+    vehicleType?: string;
+    fuelPowerType?: string;
     brand?: string;
     availability?: string;
     search?: string;
@@ -102,42 +104,76 @@ export const api = {
   }): Promise<{ bikes: Bike[] }> {
     try {
       const query = new URLSearchParams();
-      if (params?.category) query.set('category', params.category);
-      if (params?.brand) query.set('brand', params.brand);
-      if (params?.availability) query.set('availability', params.availability);
+      if (params?.category && params.category !== 'All') query.set('category', params.category);
+      if (params?.vehicleType && params.vehicleType !== 'All') query.set('vehicleType', params.vehicleType);
+      if (params?.fuelPowerType && params.fuelPowerType !== 'All') query.set('fuelPowerType', params.fuelPowerType);
+      if (params?.brand && params.brand !== 'All') query.set('brand', params.brand);
+      if (params?.availability && params.availability !== 'All') query.set('availability', params.availability);
       if (params?.search) query.set('search', params.search);
       if (params?.maxPrice) query.set('maxPrice', String(params.maxPrice));
       if (params?.sort) query.set('sort', params.sort);
 
       const res = await fetch(`${API_BASE}/bikes?${query.toString()}`);
       const data = await handleResponse<{ bikes: Bike[] }>(res);
-      if (data && Array.isArray(data.bikes) && data.bikes.length > 0) {
+      if (data && Array.isArray(data.bikes)) {
         return data;
       }
       return { bikes: initialBikes };
     } catch (err) {
       console.warn('Backend /api/bikes unavailable, serving bundled fleet:', err);
       let filtered = [...initialBikes];
-      if (params?.category) {
-        filtered = filtered.filter((b) => b.bikeType.toLowerCase().includes(params.category!.toLowerCase()));
+      if (params?.vehicleType && params.vehicleType !== 'All') {
+        filtered = filtered.filter((b) => {
+          const vType = b.vehicleType || (b.specifications?.engineCc ? 'motorcycle' : 'bike');
+          return vType.toLowerCase() === params.vehicleType!.toLowerCase();
+        });
       }
-      if (params?.brand) {
+      if (params?.fuelPowerType && params.fuelPowerType !== 'All') {
+        filtered = filtered.filter((b) => {
+          const fType = b.fuelPowerType || (b.specifications?.fuelType?.toLowerCase().includes('petrol') ? 'Petrol' : b.bikeType.toLowerCase().includes('electric') ? 'Electric' : 'Petrol');
+          return fType.toLowerCase() === params.fuelPowerType!.toLowerCase();
+        });
+      }
+      if (params?.category && params.category !== 'All') {
+        const catLower = params.category.toLowerCase();
+        if (catLower === 'bikes' || catLower === 'bicycles') {
+          filtered = filtered.filter((b) => (b.vehicleType || (b.specifications?.engineCc ? 'motorcycle' : 'bike')) === 'bike');
+        } else if (catLower === 'motorcycles' || catLower === 'motorcycles / 2-wheelers') {
+          filtered = filtered.filter((b) => (b.vehicleType || (b.specifications?.engineCc ? 'motorcycle' : 'bike')) === 'motorcycle');
+        } else {
+          filtered = filtered.filter((b) => b.bikeType.toLowerCase().includes(catLower));
+        }
+      }
+      if (params?.brand && params.brand !== 'All') {
         filtered = filtered.filter((b) => b.brand.toLowerCase() === params.brand!.toLowerCase());
       }
-      if (params?.availability) {
+      if (params?.availability && params.availability !== 'All') {
         filtered = filtered.filter((b) => b.availability === params.availability);
       }
-      if (params?.search) {
-        const q = params.search.toLowerCase();
+      if (params?.search && params.search.trim()) {
+        const q = params.search.toLowerCase().trim();
         filtered = filtered.filter((b) =>
           b.name.toLowerCase().includes(q) ||
           b.brand.toLowerCase().includes(q) ||
           b.model.toLowerCase().includes(q) ||
+          b.bikeType.toLowerCase().includes(q) ||
+          (b.fuelPowerType && b.fuelPowerType.toLowerCase().includes(q)) ||
           b.location.toLowerCase().includes(q)
         );
       }
       if (params?.maxPrice) {
         filtered = filtered.filter((b) => b.hourlyPrice <= params.maxPrice! || b.dailyPrice <= params.maxPrice!);
+      }
+      if (params?.sort) {
+        if (params.sort === 'price-low') {
+          filtered.sort((a, b) => a.hourlyPrice - b.hourlyPrice);
+        } else if (params.sort === 'price-high') {
+          filtered.sort((a, b) => b.hourlyPrice - a.hourlyPrice);
+        } else if (params.sort === 'rating') {
+          filtered.sort((a, b) => b.rating - a.rating);
+        } else if (params.sort === 'name') {
+          filtered.sort((a, b) => a.name.localeCompare(b.name));
+        }
       }
       return { bikes: filtered };
     }

@@ -13,6 +13,7 @@ interface BikesPageProps {
 const INITIAL_FILTERS: FilterState = {
   search: '',
   vehicleType: 'All',
+  fuelPowerType: 'All',
   category: 'All',
   brand: 'All',
   availability: 'All',
@@ -41,6 +42,20 @@ export const BikesPage: React.FC<BikesPageProps> = ({
         if (filters.vehicleType && filters.vehicleType !== 'All') {
           const vType = bike.vehicleType || (bike.specifications?.engineCc ? 'motorcycle' : 'bike');
           if (vType !== filters.vehicleType) {
+            return false;
+          }
+        }
+
+        // Fuel / Power Type (All / Petrol / Diesel / Electric / Hybrid)
+        if (filters.fuelPowerType && filters.fuelPowerType !== 'All') {
+          const fType =
+            bike.fuelPowerType ||
+            (bike.specifications?.fuelType?.toLowerCase().includes('petrol')
+              ? 'Petrol'
+              : bike.bikeType.toLowerCase().includes('electric')
+              ? 'Electric'
+              : 'Petrol');
+          if (fType.toLowerCase() !== filters.fuelPowerType.toLowerCase()) {
             return false;
           }
         }
@@ -80,6 +95,7 @@ export const BikesPage: React.FC<BikesPageProps> = ({
             bike.brand.toLowerCase().includes(q) ||
             bike.bikeType.toLowerCase().includes(q) ||
             bike.location.toLowerCase().includes(q) ||
+            (bike.fuelPowerType && bike.fuelPowerType.toLowerCase().includes(q)) ||
             (bike.specifications.gears && bike.specifications.gears.toLowerCase().includes(q)) ||
             (bike.specifications.engineCc && `${bike.specifications.engineCc}`.includes(q)) ||
             (bike.specifications.powerBhp && bike.specifications.powerBhp.toLowerCase().includes(q));

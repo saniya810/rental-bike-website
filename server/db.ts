@@ -55,16 +55,18 @@ class DatabaseService {
         if (!this.data.policies) {
           this.data.policies = initialPolicies;
         }
-        // Ensure that any newly added vehicles (such as motorcycles) are merged into existing data
-        if (!this.data.bikes || this.data.bikes.length < initialBikes.length) {
-          const existingIds = new Set((this.data.bikes || []).map((b) => b.id));
-          for (const bike of initialBikes) {
-            if (!existingIds.has(bike.id)) {
-              this.data.bikes.push(bike);
-            }
-          }
-          this.save();
+        // Ensure that all official fleet vehicles (including the 12 motorcycles and 3 bicycles) are present and updated with latest specs
+        const bikeMap = new Map<string, Bike>();
+        // First populate with any existing user-created bikes from DB
+        for (const bike of this.data.bikes || []) {
+          bikeMap.set(bike.id, bike);
         }
+        // Then ensure all initialBikes overwrite or add with the canonical specs, images, fuel types
+        for (const bike of initialBikes) {
+          bikeMap.set(bike.id, bike);
+        }
+        this.data.bikes = Array.from(bikeMap.values());
+        this.save();
       } catch (err) {
         console.warn('Failed reading database.json, re-seeding in-memory store:', err);
         this.data = seedDatabase();
