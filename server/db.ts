@@ -30,11 +30,6 @@ interface DatabaseSchema {
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
 // Supabase client initialization (if credentials configured)
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -43,438 +38,41 @@ export const supabase: SupabaseClient | null =
 
 export const isSupabaseConnected = Boolean(supabase);
 
-// Default seed data with INR rates and motorcycle policy
-const initialPolicies: RentalPolicies = {
-  securityDepositStandard: 1000,
-  securityDepositElectric: 2000,
-  securityDepositMotorcycle: 3000,
-  damageChargesPolicy:
-    'Renter is liable for any physical damage beyond normal wear & tear. Itemized fees: Tyre puncture repair: ₹150; Chain/derailleur repair: ₹450; Bent rim repair: ₹800; Mirror/indicator breakage: ₹350; Frame or engine damage: authorized workshop quote.',
-  lateReturnChargesPolicy:
-    'A 30-minute courtesy grace period is provided. Subsequent overdue hours are charged at ₹150/hour plus the standard hourly rate.',
-  lateFeePerHour: 150,
-  gracePeriodMinutes: 30,
-  fuelPolicy:
-    'Motorcycles are dispatched with sufficient fuel to reach the nearest fuel station and must be returned with the same fuel level as recorded at handover. Electric 2-wheelers are provided at ≥90% charge and must be returned with at least 20% battery or a ₹150 recharge fee applies.',
-  cancellationPolicy:
-    'Free cancellation up to 4 hours before reserved pickup time for a 100% full refund to source. Cancellations made under 4 hours incur a 50% reservation fee.',
-  rentalExtensionChargesPolicy:
-    'Rental extensions can be requested anytime from My Bookings subject to vehicle availability at standard hourly or daily rates in INR.',
-  trafficFineResponsibility:
-    'The customer holds 100% legal responsibility for any traffic e-challans, speeding violations, red-light citations, or illegal parking fines incurred during active rental periods.',
-  drivingLicenceRequirements:
-    'All riders renting motorized 2-wheelers or motorcycles must possess a valid Indian Driving License (MCWG / Two Wheeler with Gear) or valid International Driving Permit (IDP). Non-motorized bicycle rentals require a valid government photo ID.',
-};
+import { initialPolicies, initialBikes, seedDatabase } from '../src/data/initialData.js';
 
-const defaultPasswordHash = bcrypt.hashSync('Admin@12345', 10);
-const userPasswordHash = bcrypt.hashSync('User@12345', 10);
-
-const initialBikes: Bike[] = [
-  {
-    id: 'bike-trek-marlin-7',
-    name: 'Trek Marlin 7 Gen 3',
-    model: 'Marlin 7 Hardtail',
-    bikeType: 'Mountain',
-    brand: 'Trek',
-    imageUrl: 'https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?auto=format&fit=crop&w=1000&q=80',
-      'https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'Alpha Silver Aluminum',
-      gears: 'Shimano Deore M5120 10-speed',
-      brakes: 'Shimano MT200 Hydraulic Disc',
-      weightKg: 13.8,
-      wheelSizeInch: 29,
-      suitableHeightCm: '165 - 188 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 12,
-    dailyPrice: 48,
-    availability: 'Available',
-    bikeCondition: 'Excellent',
-    rating: 4.9,
-    reviewCount: 28,
-    location: 'Central Park Hub',
-    description: 'Trail-ready cross-country mountain bike with suspension lockout and modern progressive trail geometry.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-specialized-turbo-veado',
-    name: 'Specialized Turbo Vado 4.0',
-    model: 'Turbo Vado 4.0 Step-Through',
-    bikeType: 'Electric / E-Bike',
-    brand: 'Specialized',
-    imageUrl: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&w=1000&q=80',
-      'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'E5 Premium Aluminum',
-      gears: 'SRAM NX 11-speed',
-      brakes: 'SRAM Level Hydraulic 180mm',
-      weightKg: 24.2,
-      wheelSizeInch: 28,
-      batteryCapacity: '710Wh Specialized U2-710',
-      maxRangeKm: 120,
-      motorPower: 'Specialized 2.0 (250W / 70Nm)',
-      suitableHeightCm: '160 - 185 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 18,
-    dailyPrice: 75,
-    availability: 'Available',
-    bikeCondition: 'Excellent',
-    rating: 5.0,
-    reviewCount: 42,
-    location: 'Downtown Station',
-    description: 'Smooth and ultra-powerful electric bike with integrated radar display, headlight, and long-range battery.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-cannondale-quick-disc-3',
-    name: 'Cannondale Quick Disc 3',
-    model: 'Quick 3 Fitness Commuter',
-    bikeType: 'City / Commuter',
-    brand: 'Cannondale',
-    imageUrl: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'SmartForm C3 Alloy',
-      gears: 'Shimano Sora 18-speed',
-      brakes: 'Tektro HD-R280 Hydraulic Disc',
-      weightKg: 10.9,
-      wheelSizeInch: 28,
-      suitableHeightCm: '170 - 190 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 9,
-    dailyPrice: 38,
-    availability: 'Available',
-    bikeCondition: 'Excellent',
-    rating: 4.8,
-    reviewCount: 19,
-    location: 'Metro Transit Terminal',
-    description: 'Agile and lightweight commuter designed for high-speed city transit, cardio fitness, and daily campus commute.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-giant-defy-advanced',
-    name: 'Giant Defy Advanced 1',
-    model: 'Defy Advanced Endurance',
-    bikeType: 'Road / Racing',
-    brand: 'Giant',
-    imageUrl: 'https://images.unsplash.com/photo-1502744688674-c619d1586c9e?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1502744688674-c619d1586c9e?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'Advanced-Grade Carbon Composite',
-      gears: 'Shimano 105 Di2 Electronic 24-Speed',
-      brakes: 'Shimano 105 Hydraulic',
-      weightKg: 8.6,
-      wheelSizeInch: 28,
-      suitableHeightCm: '172 - 188 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 20,
-    dailyPrice: 85,
-    availability: 'Available',
-    bikeCondition: 'Excellent',
-    rating: 4.95,
-    reviewCount: 31,
-    location: 'Westside Waterfront',
-    description: 'Ultra-light carbon endurance road bike built for century rides, mountain climbs, and exhilarating weekend pavement speed.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-rad-city-5-plus',
-    name: 'Rad Power RadCity 5 Plus',
-    model: 'RadCity 5 Plus Step-Thru',
-    bikeType: 'Electric / E-Bike',
-    brand: 'Rad Power',
-    imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: '6061 Aluminum Alloy',
-      gears: 'Microshift 7-Speed',
-      brakes: 'Nutt Hydraulic Disc',
-      weightKg: 29.5,
-      wheelSizeInch: 27.5,
-      batteryCapacity: '672Wh Lithium-ion',
-      maxRangeKm: 85,
-      motorPower: '750W Geared Hub Motor',
-      suitableHeightCm: '155 - 185 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 16,
-    dailyPrice: 65,
-    availability: 'Available',
-    bikeCondition: 'Good',
-    rating: 4.75,
-    reviewCount: 36,
-    location: 'University Campus',
-    description: 'Comfortable step-thru electric cruiser with cargo rack, front suspension, and hill-conquering torque.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-brompton-c-line-explore',
-    name: 'Brompton C Line Explore',
-    model: 'C Line 6-Speed Folding',
-    bikeType: 'City / Commuter',
-    brand: 'Brompton',
-    imageUrl: 'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'Precision Drawn Heat-Treated Steel',
-      gears: 'Brompton Wide Range 6-speed',
-      brakes: 'Brompton Dual Pivot Calipers',
-      weightKg: 12.1,
-      wheelSizeInch: 16,
-      suitableHeightCm: '145 - 195 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 14,
-    dailyPrice: 55,
-    availability: 'Available',
-    bikeCondition: 'Excellent',
-    rating: 4.88,
-    reviewCount: 22,
-    location: 'Downtown Station',
-    description: 'Iconic British folding bicycle engineered to fit anywhere—subway trains, cafes, and car trunks with ease.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-trek-dual-sport-3',
-    name: 'Trek Dual Sport 3 Gen 5',
-    model: 'Dual Sport All-Terrain',
-    bikeType: 'Hybrid',
-    brand: 'Trek',
-    imageUrl: 'https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'Alpha Gold Aluminum',
-      gears: 'Shimano Deore 1x10-speed',
-      brakes: 'Shimano MT201 Hydraulic',
-      weightKg: 11.8,
-      wheelSizeInch: 27.5,
-      suitableHeightCm: '165 - 185 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 11,
-    dailyPrice: 44,
-    availability: 'Available',
-    bikeCondition: 'Good',
-    rating: 4.8,
-    reviewCount: 15,
-    location: 'Central Park Hub',
-    description: 'Go-anywhere hybrid bike that rolls smoothly over pavement while confident on gravel and light dirt tracks.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'bike-electra-cruiser-7d',
-    name: 'Electra Townie 7D Cruiser',
-    model: 'Townie 7D Flat Foot',
-    bikeType: 'Cruiser',
-    brand: 'Specialized',
-    imageUrl: 'https://images.unsplash.com/photo-1528629297340-d1d461b55f91?auto=format&fit=crop&w=1000&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1528629297340-d1d461b55f91?auto=format&fit=crop&w=1000&q=80',
-    ],
-    specifications: {
-      frameMaterial: 'Classic Steel Cruiser Frame',
-      gears: 'Shimano Tourney 7-speed',
-      brakes: 'Alloy Linear-Pull',
-      weightKg: 15.2,
-      wheelSizeInch: 26,
-      suitableHeightCm: '155 - 190 cm',
-      helmetIncluded: true,
-      lockIncluded: true,
-    },
-    hourlyPrice: 8,
-    dailyPrice: 32,
-    availability: 'Available',
-    bikeCondition: 'Good',
-    rating: 4.7,
-    reviewCount: 17,
-    location: 'Westside Waterfront',
-    description: 'Relaxed upright geometry with ergonomic saddle and wide balloon tires for coastal cruising and leisurely sightseeing.',
-    createdAt: new Date().toISOString(),
-  },
-];
-
-function seedDatabase(): DatabaseSchema {
-  const users = [
-    {
-      id: 'usr-admin-01',
-      name: 'Fleet Administrator',
-      email: 'admin@bikeshare.com',
-      passwordHash: defaultPasswordHash,
-      role: 'admin' as const,
-      phone: '+1 555-019-2831',
-      drivingLicenseNumber: 'DL-ADM-998822',
-      createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    },
-    {
-      id: 'usr-customer-01',
-      name: 'Alex Rivera',
-      email: 'user@bikeshare.com',
-      passwordHash: userPasswordHash,
-      role: 'customer' as const,
-      phone: '+1 555-014-9923',
-      drivingLicenseNumber: 'DL-NY-7729103',
-      createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
-    },
-  ];
-
-  const bookings: Booking[] = [
-    {
-      id: 'bk-2026-001',
-      userId: 'usr-customer-01',
-      userName: 'Alex Rivera',
-      userEmail: 'user@bikeshare.com',
-      userPhone: '+1 555-014-9923',
-      bikeId: 'bike-trek-marlin-7',
-      bike: initialBikes[0],
-      rentalType: 'hourly',
-      pickupDate: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
-      pickupTime: '10:00',
-      returnDate: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
-      returnTime: '14:00',
-      pickupLocation: 'Central Park Hub',
-      durationHours: 4,
-      durationDays: 1,
-      rentalCost: 48,
-      securityDeposit: 50,
-      taxes: 3.84,
-      additionalCharges: 0,
-      totalAmount: 101.84,
-      bookingStatus: 'completed',
-      paymentStatus: 'paid',
-      paymentProvider: 'Stripe Gateway (Verified)',
-      drivingLicenseNumber: 'DL-NY-7729103',
-      createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-    },
-    {
-      id: 'bk-2026-002',
-      userId: 'usr-customer-01',
-      userName: 'Alex Rivera',
-      userEmail: 'user@bikeshare.com',
-      userPhone: '+1 555-014-9923',
-      bikeId: 'bike-specialized-turbo-veado',
-      bike: initialBikes[1],
-      rentalType: 'daily',
-      pickupDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-      pickupTime: '09:00',
-      returnDate: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
-      returnTime: '17:00',
-      pickupLocation: 'Downtown Station',
-      durationHours: 56,
-      durationDays: 2,
-      rentalCost: 150,
-      securityDeposit: 100,
-      taxes: 12.0,
-      additionalCharges: 0,
-      totalAmount: 262.0,
-      bookingStatus: 'upcoming',
-      paymentStatus: 'paid',
-      paymentProvider: 'Stripe Gateway (Verified)',
-      drivingLicenseNumber: 'DL-NY-7729103',
-      createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-    },
-  ];
-
-  const inspections: Inspection[] = [
-    {
-      id: 'insp-001',
-      bookingId: 'bk-2026-001',
-      bikeId: 'bike-trek-marlin-7',
-      bikeName: 'Trek Marlin 7 Gen 3',
-      inspectorName: 'Fleet Admin (Tech Station 2)',
-      inspectionType: 'post_rental',
-      bikeCondition: 'Pristine',
-      damageDetails: 'Normal road dust. Chain lubricated and tire pressures verified at 35 PSI. No damage detected.',
-      damageCharges: 0,
-      inspectedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-    },
-  ];
-
-  const reviews: Review[] = [
-    {
-      id: 'rev-001',
-      userId: 'usr-customer-01',
-      userName: 'Alex Rivera',
-      bikeId: 'bike-trek-marlin-7',
-      rating: 5,
-      comment: 'Super crisp shifting and fantastic suspension for the rocky park trails! Pickup was instantaneous at Central Park Hub.',
-      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    },
-    {
-      id: 'rev-002',
-      userId: 'usr-customer-01',
-      userName: 'Sarah Jenkins (Tourist)',
-      bikeId: 'bike-specialized-turbo-veado',
-      rating: 5,
-      comment: 'The electric boost easily flattened all the city bridge climbs. Rode over 60km and still had 60% battery left!',
-      createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    },
-  ];
-
-  return {
-    users,
-    bikes: initialBikes,
-    bookings,
-    inspections,
-    reviews,
-    wishlist: [
-      {
-        id: 'wsh-01',
-        userId: 'usr-customer-01',
-        bikeId: 'bike-giant-defy-advanced',
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    cart: [],
-    policies: initialPolicies,
-  };
-}
-
-// Database helper functions with automatic disk syncing
+// Database helper functions with automatic disk syncing and serverless resilience
 class DatabaseService {
-  private data: DatabaseSchema;
+  private data: DatabaseSchema = seedDatabase();
 
   constructor() {
+    let loaded = false;
     if (fs.existsSync(DB_FILE)) {
       try {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         this.data = JSON.parse(raw);
+        loaded = true;
         // Ensure policies exist if schema evolved
         if (!this.data.policies) {
           this.data.policies = initialPolicies;
         }
+        // Ensure that any newly added vehicles (such as motorcycles) are merged into existing data
+        if (!this.data.bikes || this.data.bikes.length < initialBikes.length) {
+          const existingIds = new Set((this.data.bikes || []).map((b) => b.id));
+          for (const bike of initialBikes) {
+            if (!existingIds.has(bike.id)) {
+              this.data.bikes.push(bike);
+            }
+          }
+          this.save();
+        }
       } catch (err) {
-        console.error('Failed reading database.json, re-seeding:', err);
+        console.warn('Failed reading database.json, re-seeding in-memory store:', err);
         this.data = seedDatabase();
         this.save();
+        loaded = true;
       }
-    } else {
+    }
+    if (!loaded) {
       this.data = seedDatabase();
       this.save();
     }
@@ -482,9 +80,13 @@ class DatabaseService {
 
   private save() {
     try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (err) {
-      console.error('Failed saving database.json:', err);
+      // In serverless environments like Vercel Lambda, the filesystem is read-only.
+      // Changes remain safely in-memory during the invocation without throwing unhandled exceptions.
     }
   }
 

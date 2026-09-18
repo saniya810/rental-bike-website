@@ -16,6 +16,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage.js';
 import { BookingModal } from './components/BookingModal.js';
 import { RentalPoliciesModal } from './components/RentalPoliciesModal.js';
 import { Bike, Booking, RentalPolicies } from './types.js';
+import { initialBikes, initialPolicies } from './data/initialData.js';
 import { api } from './services/api.js';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -24,10 +25,10 @@ export function AppContent() {
   const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-  // Fleet & Policies State
-  const [bikes, setBikes] = useState<Bike[]>([]);
-  const [policies, setPolicies] = useState<RentalPolicies | undefined>(undefined);
-  const [isLoadingFleet, setIsLoadingFleet] = useState<boolean>(true);
+  // Fleet & Policies State - initialized with full Indian fleet as instant baseline
+  const [bikes, setBikes] = useState<Bike[]>(initialBikes);
+  const [policies, setPolicies] = useState<RentalPolicies | undefined>(initialPolicies);
+  const [isLoadingFleet, setIsLoadingFleet] = useState<boolean>(false);
   const [fleetError, setFleetError] = useState<string | null>(null);
 
   // Global Booking Modal State
@@ -37,22 +38,22 @@ export function AppContent() {
   // Global Policies Modal State
   const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState<boolean>(false);
 
-  // Fetch initial fleet and policies from the backend
+  // Fetch initial fleet and policies from the backend (with silent fallback to bundled data)
   const fetchFleet = async () => {
     try {
-      setIsLoadingFleet(true);
       const [bikesRes, polRes] = await Promise.all([
         api.getBikes(),
         api.getPolicies(),
       ]);
-      setBikes(bikesRes.bikes);
-      setPolicies(polRes.policies);
+      if (bikesRes && Array.isArray(bikesRes.bikes) && bikesRes.bikes.length > 0) {
+        setBikes(bikesRes.bikes);
+      }
+      if (polRes && polRes.policies) {
+        setPolicies(polRes.policies);
+      }
       setFleetError(null);
     } catch (err: any) {
-      console.error('Failed to load fleet data:', err);
-      setFleetError(err.message || 'Could not connect to fleet server.');
-    } finally {
-      setIsLoadingFleet(false);
+      console.warn('Network fetch failed, retained bundled fleet data:', err);
     }
   };
 

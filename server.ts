@@ -3,7 +3,6 @@ import path from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { createServer as createViteServer } from 'vite';
 import { db, isSupabaseConnected } from './server/db.js';
 import { User, Booking, Bike, Inspection, Review } from './src/types.js';
 
@@ -825,6 +824,7 @@ ${urls
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -843,4 +843,9 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+export { app };
+
+if (!process.env.VERCEL) {
+  startServer();
+}

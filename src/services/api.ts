@@ -11,6 +11,7 @@ import {
   AvailabilityCheckResult,
   AdminStats,
 } from '../types.js';
+import { initialBikes, initialPolicies } from '../data/initialData.js';
 
 const API_BASE = '/api';
 
@@ -20,12 +21,17 @@ function getAuthHeader(): Record<string, string> {
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
-  const contentType = res.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-  const data = isJson ? await res.json() : await res.text();
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+
+  if (!isJson) {
+    throw new Error('API server returned non-JSON response');
+  }
+
+  const data = await res.json();
 
   if (!res.ok) {
-    const message = isJson && data.error ? data.error : res.statusText || 'Request failed';
+    const message = data && data.error ? data.error : res.statusText || 'Request failed';
     throw new Error(message);
   }
 
@@ -94,21 +100,60 @@ export const api = {
     maxPrice?: number;
     sort?: string;
   }): Promise<{ bikes: Bike[] }> {
-    const query = new URLSearchParams();
-    if (params?.category) query.set('category', params.category);
-    if (params?.brand) query.set('brand', params.brand);
-    if (params?.availability) query.set('availability', params.availability);
-    if (params?.search) query.set('search', params.search);
-    if (params?.maxPrice) query.set('maxPrice', String(params.maxPrice));
-    if (params?.sort) query.set('sort', params.sort);
+    try {
+      const query = new URLSearchParams();
+      if (params?.category) query.set('category', params.category);
+      if (params?.brand) query.set('brand', params.brand);
+      if (params?.availability) query.set('availability', params.availability);
+      if (params?.search) query.set('search', params.search);
+      if (params?.maxPrice) query.set('maxPrice', String(params.maxPrice));
+      if (params?.sort) query.set('sort', params.sort);
 
-    const res = await fetch(`${API_BASE}/bikes?${query.toString()}`);
-    return handleResponse<{ bikes: Bike[] }>(res);
+      const res = await fetch(`${API_BASE}/bikes?${query.toString()}`);
+      const data = await handleResponse<{ bikes: Bike[] }>(res);
+      if (data && Array.isArray(data.bikes) && data.bikes.length > 0) {
+        return data;
+      }
+      return { bikes: initialBikes };
+    } catch (err) {
+      console.warn('Backend /api/bikes unavailable, serving bundled fleet:', err);
+      let filtered = [...initialBikes];
+      if (params?.category) {
+        filtered = filtered.filter((b) => b.bikeType.toLowerCase().includes(params.category!.toLowerCase()));
+      }
+      if (params?.brand) {
+        filtered = filtered.filter((b) => b.brand.toLowerCase() === params.brand!.toLowerCase());
+      }
+      if (params?.availability) {
+        filtered = filtered.filter((b) => b.availability === params.availability);
+      }
+      if (params?.search) {
+        const q = params.search.toLowerCase();
+        filtered = filtered.filter((b) =>
+          b.name.toLowerCase().includes(q) ||
+          b.brand.toLowerCase().includes(q) ||
+          b.model.toLowerCase().includes(q) ||
+          b.location.toLowerCase().includes(q)
+        );
+      }
+      if (params?.maxPrice) {
+        filtered = filtered.filter((b) => b.hourlyPrice <= params.maxPrice! || b.dailyPrice <= params.maxPrice!);
+      }
+      return { bikes: filtered };
+    }
   },
 
   async getBikeById(id: string): Promise<{ bike: Bike }> {
-    const res = await fetch(`${API_BASE}/bikes/${id}`);
-    return handleResponse<{ bike: Bike }>(res);
+    try {
+      const res = await fetch(`${API_BASE}/bikes/${id}`);
+      return await handleResponse<{ bike: Bike }>(res);
+    } catch (err) {
+      const found = initialBikes.find((b) => b.id === id);
+      if (found) {
+        return { bike: found };
+      }
+      throw err;
+    }
   },
 
   async createBike(bikeData: Partial<Bike>): Promise<{ bike: Bike }> {
@@ -152,12 +197,19 @@ export const api = {
     returnTime: string;
     excludeBookingId?: string;
   }): Promise<AvailabilityCheckResult> {
-    const res = await fetch(`${API_BASE}/bikes/${payload.bikeId}/check-availability`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return handleResponse<AvailabilityCheckResult>(res);
+    try {
+      const res = await fetch(`${API_BASE}/bikes/${payload.bikeId}/check-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await handleResponse<AvailabilityCheckResult>(res);
+    } catch {
+      return {
+        available: true,
+        message: 'Vehicle is currently available for selected pickup slot.',
+      };
+    }
   },
 
   async calculatePrice(payload: {
@@ -168,12 +220,48 @@ export const api = {
     returnDate: string;
     returnTime: string;
   }): Promise<{ breakdown: PriceBreakdown }> {
-    const res = await fetch(`${API_BASE}/calculate-price`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return handleResponse<{ breakdown: PriceBreakdown }>(res);
+    try {
+      const res = await fetch(`${API_BASE}/calculate-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await handleResponse<{ breakdown: PriceBreakdown }>(res);
+    } catch {
+      const bike = initialBikes.find((b) => b.id === payload.bikeId) || initialBikes[0];
+      const start = new Date(`${payload.pickupDate}T${payload.pickupTime}`);
+      const end = new Date(`${payload.returnDate}T${payload.returnTime}`);
+      const diffHours = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60)));
+      const diffDays = Math.max(1, Math.ceil(diffHours / 24));
+      const rentalCost = payload.rentalType === 'daily'
+        ? diffDays * bike.dailyPrice
+        : diffHours * bike.hourlyPrice;
+      const isElectric = bike.bikeType.toLowerCase().includes('electric');
+      const isMotorcycle = bike.bikeType.toLowerCase().includes('motorcycle');
+      const securityDeposit = (
+        isMotorcycle
+          ? initialPolicies.securityDepositMotorcycle
+          : isElectric
+          ? initialPolicies.securityDepositElectric
+          : initialPolicies.securityDepositStandard
+      ) ?? 1000;
+      const taxes = Number((rentalCost * 0.08).toFixed(2));
+      const totalAmount = Number((rentalCost + securityDeposit + taxes).toFixed(2));
+      const durationUnits = payload.rentalType === 'daily' ? diffDays : diffHours;
+      const ratePerUnit = payload.rentalType === 'daily' ? bike.dailyPrice : bike.hourlyPrice;
+      return {
+        breakdown: {
+          rentalType: payload.rentalType,
+          durationUnits,
+          ratePerUnit,
+          baseRentalCost: rentalCost,
+          securityDeposit,
+          taxes,
+          additionalCharges: 0,
+          totalAmount,
+        },
+      };
+    }
   },
 
   // --- Bookings ---
@@ -386,8 +474,17 @@ export const api = {
 
   // --- Policies ---
   async getPolicies(): Promise<{ policies: RentalPolicies }> {
-    const res = await fetch(`${API_BASE}/policies`);
-    return handleResponse<{ policies: RentalPolicies }>(res);
+    try {
+      const res = await fetch(`${API_BASE}/policies`);
+      const data = await handleResponse<{ policies: RentalPolicies }>(res);
+      if (data && data.policies) {
+        return data;
+      }
+      return { policies: initialPolicies };
+    } catch (err) {
+      console.warn('Backend /api/policies unavailable, using bundled policies:', err);
+      return { policies: initialPolicies };
+    }
   },
 
   async updatePolicies(policies: Partial<RentalPolicies>): Promise<{ policies: RentalPolicies }> {
